@@ -1,0 +1,49 @@
+---
+title: "Tutor Summary Data Briefing"
+author: "Tianze (Steven) Shou"
+date: "7/13/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+) 
+library(tidyverse)
+```
+
+Here we are just going to make some basic visuals on the output summary data from tutor log: 
+
+```{r}
+summaryDF = read_csv("output_files/tutor_summary.csv") 
+summaryDF$dayID = factor(summaryDF$dayID)
+summaryDF$periodID = factor(summaryDF$periodID)
+head(summaryDF)
+```
+
+```{r}
+ggplot(summaryDF, aes(x=dayID, y=correct_attempt_rate, group=periodID, color=periodID)) + 
+  geom_line() + 
+  geom_point() +
+  labs(title="Proportion of Correct Attempt by Period and Day") 
+```
+
+```{r}
+ggplot(summaryDF, aes(x=dayID, y=`cancel-const_rate`, group=periodID, color=periodID)) + 
+  geom_line() + 
+  geom_point() +
+  labs(title="Proportion of Correct Attempt in `Cancel-Constant` KC by Period and Day") 
+```
+
+```{r}
+ggplot(summaryDF, aes(x=dayID, y=problem_level_mean, group=periodID, color=periodID)) + 
+  geom_line() + 
+  geom_point() +
+  labs(title="Mean Problem Level by Period and Day") 
+```
+
+
+
+
