@@ -8,6 +8,7 @@
 # encoded. 
 ################################################################################
 
+from time import time
 import pandas as pd 
 import numpy as np 
 
@@ -47,8 +48,7 @@ def getStudentStatusDurationByDetector(detectorResultsDF, detectorName: str, stu
 
     assert detectorName in detectorResultsDF.columns, "Input detector results data does not have input detector name column" 
     
-    # filtered rows with given detector's results available 
-    filteredDF = detectorResultsDF.loc[detectorResultsDF[detectorName].notnull()] 
+    filteredDF = detectorResultsDF.copy()
     # filter by day and period ID's 
     if periodID != None: filteredDF = filteredDF.loc[filteredDF["periodID"] == periodID] 
     if dayID != None: filteredDF = filteredDF.loc[filteredDF["dayID"] == dayID] 
@@ -77,9 +77,14 @@ def getStudentStatusDurationByDetector(detectorResultsDF, detectorName: str, stu
             if not (filteredDF.loc[i, "dayID"] ==  filteredDF.loc[i-1, "dayID"] and \
                     filteredDF.loc[i, "periodID"] ==  filteredDF.loc[i-1, "periodID"]): 
 
-                # if not in the same day/period, triggered is off and add time chunk to retuls
+                # if not in the same day/period, triggered is off and add time chunk to results
                 triggered = False
                 timeAdded = filteredDF.loc[i-1, "timestamp"] - timeTriggered
+
+                # trigerring indicator turned back on if current row is greater than 0
+                if filteredDF.loc[i, detectorName] > 0: 
+                    triggered = True
+                    timeTriggered = filteredDF.loc[i, "timestamp"]
 
             if filteredDF.loc[i, detectorName] > 0: # if current row is still triggered 
                 triggered = True
@@ -105,7 +110,8 @@ if __name__ == "__main__":
 
     DF = getDetectorResultsDF()
     print(getStudentStatusDurationByDetector(DF, "struggle", "Stu_011924479d5e1be392bb55cb21567c3f")) 
-    print(getStudentStatusDurationByDetector(DF, "struggle", "Stu_03cac10de8d282be297f7b1550ef153d")) 
+    print(getStudentStatusDurationByDetector(DF, "idle", "Stu_3c3d511146fad19db4b08d2ecb35a835")) 
+    print(getStudentStatusDurationByDetector(DF, "struggle", "Stu_3c3d511146fad19db4b08d2ecb35a835")) 
 
 
 
