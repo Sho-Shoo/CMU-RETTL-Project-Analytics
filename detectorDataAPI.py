@@ -178,6 +178,54 @@ def getStudentStatusDurationByDetector(detectorResultsDF, detectorName: str, stu
 
     # sort by timestamp 
     filteredDF = filteredDF.sort_values(by="timestamp", ignore_index=True) 
+    
+    # get under-status intervals 
+    intervals = getStatusStartEndTime(filteredDF, studentID, detectorName)
+
+    # calculate length of each interval and add to res
+    res = 0 # to be returned 
+    for start, end, dayID, periodID in intervals: 
+        assert end - start >= 0, f"Invalid interval length: end - start = {end - start}"
+        res += end - start
+
+    return res 
+
+def getStudentStatusDurationByDetector2(detectorResultsDF, detectorName: str, studentID: str, periodID=None, dayID=None) -> float: 
+
+    """
+    Input a dataframe holding results from LearnSphere detector plugin (usually returned by getDetectorResultsDF())
+    and specify the name of the detector and the student ID to see how long the student was detector to be under 
+    the corresponding status (idle, gaming, etc.). 
+
+    Args:
+        detectorResultsDF (pd.DataFrame): usually pandas dataframe imported and validated by getDetectorResultsDF() 
+        detectorName (str): name of the detector, must have corresponding column name in the input dataframe 
+        studentID (str): student ID of the given student whose duration under status needs to be calculated
+        periodID (int, optional): period ID specification. Defaults to None.
+        dayID (int, optional): day ID specification. Defaults to None.
+
+    Returns:
+        float: number of seconds that the student spent under the status specified by corresponding detector 
+    """    
+
+    # ensure that necessary columns are in detectorResultsDF 
+    assert "studentID" in detectorResultsDF.columns and "timestamp" in detectorResultsDF.columns and \
+           "dayID" in detectorResultsDF.columns and "periodID" in detectorResultsDF.columns and \
+           "Input detector results data file does not have necessary column(s)" 
+
+    assert detectorName in detectorResultsDF.columns, "Input detector results data does not have input detector name column" 
+    
+    filteredDF = detectorResultsDF.copy()
+    # filter by day and period ID's 
+    if periodID != None: filteredDF = filteredDF.loc[filteredDF["periodID"] == periodID] 
+    if dayID != None: filteredDF = filteredDF.loc[filteredDF["dayID"] == dayID] 
+    # if the student is not found, just return NaN 
+    if not studentID in filteredDF["studentID"].tolist(): return np.nan
+    # filtered by studentID
+    filteredDF = filteredDF.loc[filteredDF["studentID"] == studentID] 
+
+    # sort by timestamp 
+    filteredDF = filteredDF.sort_values(by="timestamp", ignore_index=True) 
     triggered = False # whether detector is triggered (giving > 0 values) when looping through filteredDF
     timeTriggered = None
     res = 0 # to be returned 
@@ -222,7 +270,6 @@ def getStudentStatusDurationByDetector(detectorResultsDF, detectorName: str, stu
         res += timeAdded
 
     return res 
-
 
 # test cases 
 if __name__ == "__main__": 
