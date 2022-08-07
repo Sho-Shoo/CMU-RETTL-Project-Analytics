@@ -23,6 +23,125 @@ def getDetectorResultsDF(path="output_files/detector_results.csv", delimiter=","
 
     return DF 
 
+def getStatusStartEndTime(detectorResultsDF, studentID: str, detectorName: str): 
+
+    """
+    Extract the starting and ending timetamp of the status corresponding to 
+    the given detector in argument 
+
+    Args:
+        detectorResultsDF (pd.DataFrame): encoded detector results dataframe, usually returned by getDetectorResultsDF()
+        studentID (str): Anon student ID
+        detectorName (str): detector name like `struggle`, must be a column in detectorResultsDF
+
+    Returns:
+        List[(float, float)]: (startTimestamp, endTimestamp) tuple representing 
+        given student's time entering and exiting the state corresponding to the 
+        detector
+    """    
+
+    assert detectorName in detectorResultsDF.columns, "detectorName not found amongst columns"
+
+    intervals = [] # to be returned 
+    # only get rows where detector result is not NaN
+    DF = detectorResultsDF.loc[detectorResultsDF[detectorName].notnull()] 
+    DF = DF.loc[DF["studentID"] == studentID]
+    DF.index = np.arange(len(DF)) 
+
+    start = None 
+    dayID = None 
+    periodID = None
+    currLevel = 0 
+    for i in DF.index: 
+        
+        # a new interval start signal 
+        if DF.loc[i, detectorName] > 0 and start == None: 
+            start = DF.loc[i, "timestamp"] 
+            dayID = DF.loc[i, "dayID"] 
+            periodID = DF.loc[i, "periodID"] 
+            currLevel = DF.loc[i, detectorName]
+            assert not np.isnan(currLevel)
+
+        # interval end signal 
+        elif start != None and DF.loc[i, detectorName] < currLevel:  
+            end = DF.loc[i-1, "timestamp"]
+            assert start != None 
+            assert dayID != None 
+            assert periodID != None
+            # append interval information to result variable 
+            intervals.append( (start, end, dayID, periodID) )
+
+            # reset control variables 
+            start, dayID, periodID, currLevel = None, None, None, 0
+
+        # another interval end signal: jumping to the next day/period
+        elif start != None and DF.loc[i, "dayID"] != dayID and DF.loc[i, "periodID"] != periodID: 
+            end = DF.loc[i-1, "timestamp"]
+            assert start != None 
+            assert dayID != None 
+            assert periodID != None
+            # append interval information to result variable 
+            intervals.append( (start, end, dayID, periodID) )
+
+            # start of the next interval
+            if DF.loc[i, detectorName] > 0: 
+                start = DF.loc[i, "timestamp"] 
+                dayID = DF.loc[i, "dayID"] 
+                periodID = DF.loc[i, "periodID"] 
+                currLevel = DF.loc[i, detectorName]
+            # not starting a new interval at i, just reset variables 
+            else: start, dayID, periodID, currLevel = None, None, None, 0
+
+        # last row as end of interval 
+        elif i == len(DF) - 1 and start != None:
+            end = DF.loc[i, "timestamp"]
+            intervals.append( (start, end, dayID, periodID) )
+
+    return intervals
+
+
+def getDetectorEvents(detectorResultsDF, detectorNames): 
+
+    """
+    Get a pandas dataframe with events data following the event-actor-subject 
+    format from detecorResultsDF, usually returned by getDetectorResultsDF() in 
+    this API. 
+
+    Args:
+        detectorResultsDF (pd.DataFrame): usually returned by getDetectorResultsDF()
+        detectorNames (iterable): list of names of detectors, should be column names of detectorResultsDF
+
+    Returns:
+        pd.DataFrame: a pandas dataframe with events data following the event-actor-subject format
+    """    
+
+    detectorEventsDF = pd.DataFrame() # to be returned 
+    
+    studentIDs = detectorResultsDF["studentID"].unique()
+
+    # generate events for each detector and student
+    for detectorName in detectorNames: 
+        for studentID in studentIDs: 
+
+            intervals = getStatusStartEndTime(detectorResultsDF, studentID, detectorName)
+            for start, end, dayID, periodID in intervals: 
+                # create tow rows for entering state and exiting state events 
+                twoRows = pd.DataFrame({"dayID": [dayID] * 2, 
+                                        "periodID": [periodID] * 2, 
+                                        "timestamp": [start, end], 
+                                        "event": [f"Entering {detectorName} State", f"Exiting {detectorName} State"], 
+                                        "actor": [studentID] * 2, 
+                                        "subject": [np.nan] * 2, 
+                                        "content": [np.nan] * 2, 
+                                        "modality": ["detector"] * 2})
+                detectorEventsDF = pd.concat([detectorEventsDF, twoRows], ignore_index=True) 
+
+    # sort by timestamp and re-index 
+    detectorEventsDF = detectorEventsDF.sort_values(by="timestamp")
+    detectorEventsDF.index = np.arange(len(detectorEventsDF)) 
+
+    return detectorEventsDF
+
 def getStudentStatusDurationByDetector(detectorResultsDF, detectorName: str, studentID: str, periodID=None, dayID=None) -> float: 
 
     """
