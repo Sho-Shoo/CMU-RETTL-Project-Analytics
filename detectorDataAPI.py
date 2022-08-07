@@ -62,19 +62,7 @@ def getStatusStartEndTime(detectorResultsDF, studentID: str, detectorName: str):
             currLevel = DF.loc[i, detectorName]
             assert not np.isnan(currLevel)
 
-        # interval end signal 
-        elif start != None and DF.loc[i, detectorName] < currLevel:  
-            end = DF.loc[i-1, "timestamp"]
-            assert start != None 
-            assert dayID != None 
-            assert periodID != None
-            # append interval information to result variable 
-            intervals.append( (start, end, dayID, periodID) )
-
-            # reset control variables 
-            start, dayID, periodID, currLevel = None, None, None, 0
-
-        # another interval end signal: jumping to the next day/period
+        # interval end signal: jumping to the next day/period
         elif start != None and DF.loc[i, "dayID"] != dayID and DF.loc[i, "periodID"] != periodID: 
             end = DF.loc[i-1, "timestamp"]
             assert start != None 
@@ -92,7 +80,19 @@ def getStatusStartEndTime(detectorResultsDF, studentID: str, detectorName: str):
             # not starting a new interval at i, just reset variables 
             else: start, dayID, periodID, currLevel = None, None, None, 0
 
-        # last row as end of interval 
+        # interval end signal: level drops
+        elif start != None and DF.loc[i, detectorName] < currLevel:  
+            end = DF.loc[i, "timestamp"]
+            assert start != None 
+            assert dayID != None 
+            assert periodID != None
+            # append interval information to result variable 
+            intervals.append( (start, end, dayID, periodID) )
+
+            # reset control variables 
+            start, dayID, periodID, currLevel = None, None, None, 0
+
+        # interval end signal: last row as end of interval 
         elif i == len(DF) - 1 and start != None:
             end = DF.loc[i, "timestamp"]
             intervals.append( (start, end, dayID, periodID) )
