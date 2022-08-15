@@ -1,0 +1,90 @@
+---
+title: "Summer 2022 Sprint 3 Report"
+author: "Tianze (Steven) Shou"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Abstract 
+
+In Sprint 3, some initial research questions on student level analytics are finalized. Student level statistics from the four modalities: observation, position, tutor log, and detector are generated and concatenated. Features from these modalities are categories and their inter-correlations are explored. Finally, some basic linear models are applied to these data. 
+
+# Introduction
+
+During the first week of Sprint 3, some initial research questions are discussed. All features related to the multi-modal data are categorized into the following groups: *student learning* (e.g., learning gain calculated from pre- and post-test data), *student engagement behavior* (e.g., duration under idle state), *student help seeking* (e.g., number of hand raises), *teacher position* (e.g., teacher's stop), and *teacher strategy* (e.g., on- and off-task visits). After some discussion with Shamya, we are going to conduct the analysis of these features from the above categories on the *student-level*, where the summary statistics of each student from the entire three days will be synthesized and we do not decompose the detailed learning trajectory of the students between these days. 
+
+# Student Level Features 
+
+The aforementioned five feature categories will be explained in this section. Topics covered are going to be these features' sources, extraction methods, and significance in real world. 
+
+## Student Learning Related Features 
+
+Three features fall into this category: `overall performance`, `conceptual learning gain`, and `procedural learning gain`. 
+
+`Overall performance` refers to each student's overall in-system proportion of correct attempts. We formulate this feature for each student with the following equation: $overallPerf = \frac{numCorrectAttpt}{numCorrectAttpt + numIncorrAttpt + numHints}$. The `overall performance` of each student during the three days will be summarized. 
+
+`Conceptual learning gain` and `procedural learning gain` are measured by pre- and post-test questions given to the students during the first and last days of the data collection phase. Recall that during the five-day data collection experiment, the first and fifth day were designed for student to complete pre- and post-tests, while the three days in between were data collection. `Conceptual learning gain` examines students understanding of mathematical constructs, and the test questions do not directly ask the students to solve problems. Whereas, `procedural learning gain` assesses student's ability to complete "solve for x" problems. 
+
+## Student Engagement Related Features 
+
+Four features fall into this category: `idle`, `struggle`, `system misuse`, and `gaming`. Each of these four states has corresponding detectors available from LearnSphere. The raw, transaction level data collected from WVW school are fed into these detectors, which generates results data. The detector result data are further synthesized into duration of each student under each state. Methods used this data engineering process are documented in `detectorDataAPI.py`. 
+
+For more information on the logic of these four LearnSphere detectors, please visit their repository: https://github.com/d19fe8/CTAT-detector-plugins
+
+## Student Help Seeking Behavior 
+
+Only one feature is associated with this category, which is `number of hand raises`. This piece of information is documented in observation data, and each student's hand raise count is summarized. 
+
+## Teacher Position 
+
+We also utilized the concept of `teacher's stop` to quantify this feature category. Parameters involved in the extraction of stops are $ duration = 10~sec,~radius = 0.5~m, range = 1~m $. From the events data file `event_master_file_D10_R500_RNG1000_sprint2_shou.csv`, stops can be extracted from the *position* modality. The total amount of time teacher stops beside a given student is summarized for each students to form the feature `total stop length`. Similarly, by taking the mean length of stops, we have `stop length mean` for each students. `Stop length max` and `stop length min` are also synthesized. 
+
+## Teacher Strategy 
+
+Two features are generated for this category: `total on-task visits` and `total off-task visits`. These counts are also associated with the observation log. Number of visits for each of the two types are summarized for all students. 
+
+# Pairs Correlation Matrix
+
+With the aforementioned features from the student level, we can create the following correlation matrix between each of the feature pairs (Figure 1)
+
+![Correlation Matrix Heat Map](output_files/correlation_matrix_sprint3_shou.png){width=600px}
+
+ A few initial observations from the correlation matrix: 
+ 
+- `totalHandRaises` has high, positive correlation with `totalOnTaskTeacherVisits` and `totalOffTaskTeacherVisits`, signifying that teacher does respond to students' help seeking 
+
+- `OverallPerformance` is highly and negatively correlated with `hintRequested`, `hintPerStep`, and `timePerStep`. It is also positively correlated with `problemsSolved`, `totalSteps`, and `PlearningGain`. 
+
+- The four engagement behavior states, `idle`, `misuse`, `gaming`, and `struggle`, are all positively correlated among themselves. 
+
+- Students who completed more problems, request less hints, and spend less time on each steps on average would have more procedural learning gain 
+
+- Students who have better in-system performance and request less hints tend to have higher conceptual learning gain. 
+
+# Naive Regression Models 
+
+## Predicting Overall In-System Performance 
+
+![Linear Regression Model Predicting Overall In-System Performance](report resources/predict_overall.png){width=450px}
+
+## Relationship Between Student Help Seeking and Teacher Strategies 
+
+![Linear Regression Model Between On-Task Visits and Hand Raising](report resources/help_seeking.png){width=450px}
+
+![Linear Regression Model Between Off-Task Visits and Hand Raising](report resources/help_seeking2.png){width=450px}
+
+
+
+
+
+
+
+
+
+
+
