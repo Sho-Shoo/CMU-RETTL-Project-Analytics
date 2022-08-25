@@ -126,7 +126,8 @@ def transformRawDetectorResults(path: str):
                         '1, > 1 min, fast attempts in a row, not deliberate?': 3,
                         '1, > 2 min, abusing hints?': 4,
                         '1, > 2 min, fast attempts in a row, not deliberate?': 4,
-                        '1, > 5 min, fast attempts in a row, not deliberate?': 5
+                        '1, > 5 min, fast attempts in a row, not deliberate?': 5, 
+                        '1, > 5 min, abusing hints?': 5
                         },
             "gaming": {'Gaming': 1, 
                         'Not gaming': 0
