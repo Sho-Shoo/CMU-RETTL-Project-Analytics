@@ -11,6 +11,133 @@
 from time import time
 import pandas as pd 
 import numpy as np 
+from datetime import datetime, timezone, timedelta
+import os
+
+def transformRawDetectorResults(path: str): 
+
+    # name mapping from detector output file to the names we are going to use in this API
+    nameMapping = {"critical_struggle": "struggle", 
+                   "idle": "idle", 
+                   "system_misuse": "misuse", 
+                   "gaming": "gaming"} 
+    shortNames = ["struggle", "idle", "misuse", "gaming"]
+    # get the list of detector output file names
+    fileNames = os.listdir(path)
+
+    DFList = [] # a list to hold all detector-generated dataframes
+    fetchedDetectors = []
+    for fileName in fileNames: 
+        fullPath = path + "/" + fileName
+        DF = pd.read_csv(fullPath, delimiter="\t", index_col=False) 
+        detectorName = DF.loc[0, "Detector_Name"] # get detector name of the file
+        assert detectorName in nameMapping, f"Encountered unexpeted detector: {detectorName}" # safety 
+        newDetectorName = nameMapping[detectorName] # get shorter name of detector
+        fetchedDetectors.append(newDetectorName)
+        DF = DF.drop(["Detector_Name"], axis=1) # drop the detector name column 
+        DF = DF.rename({"Value": newDetectorName}, axis=1) # rename Value column to shorter detector name
+        DFList.append(DF) 
+
+    # prompt 
+    print(f"Fetched results from {len(fetchedDetectors)} detectors: {fetchedDetectors}")
+
+    # one dataframe to hold all detector results
+    detectorDF = pd.concat(DFList, ignore_index=True)
+    # get groups of each student_id&time pair
+    studentTimePairs = detectorDF.groupby(["Student_ID", "Time"]) 
+
+    def getFirstStringInIterable(series): 
+        '''
+        returns the first occurrence of string object in an iterable, if there is no
+        string object, returns NaN
+        '''
+        for item in series: 
+            if isinstance(item, str): return item 
+
+        return np.nan
+
+    # new dataframe with columns: studentID, time, values from four detectors
+    studentStatusDF = pd.DataFrame() 
+    # here we are going to get only the first string value in each student-time 
+    # pair, since there may be multiple for on column
+    for name in shortNames: 
+        if name in pd.unique(detectorDF.columns): 
+            studentStatusDF[name] = studentTimePairs[name].apply(getFirstStringInIterable)
+
+    # extract studentID and time from group column 
+    studentIDs = [] 
+    times = [] 
+    for groupName in studentStatusDF.index: 
+        studentIDs.append(groupName[0]) 
+        times.append(groupName[1])
+    studentStatusDF["studentID"] = studentIDs 
+    studentStatusDF["time"] = times 
+    studentStatusDF.index = np.arange(len(studentStatusDF)) # re-order index as int series 
+
+    # add time zone info 
+    studentStatusDF["time_zone"] = "UTC" 
+
+    def UTCDatetime2epoch(dateTime, format="%Y-%m-%d %H:%M:%S"):
+        """Converts UTC date-time string to epoch time represented by an interger 
+
+        Args:
+            datetime (str): date-time string, in UTC time zone
+            format (str, optional): python time module time string formats, read more in `time` documentation. Defaults to "%Y-%m-%d %H:%M:%S".
+
+        Returns: 
+            int: epoch/unix time stamp integer
+        """    
+
+        # read-in datetime string
+        datetimeStruct = datetime.strptime(dateTime, format) 
+        # add time zone informartion 
+        datetimeStruct = datetimeStruct.replace(tzinfo=timezone.utc) 
+        timestamp = datetimeStruct.timestamp()
+        return timestamp 
+
+    # transform UTC date-time to epoch time stamp 
+    studentStatusDF["timestamp"] = studentStatusDF["time"].apply(lambda x: UTCDatetime2epoch(x, format="%Y-%m-%dT%H:%M:%S.%fZ"))
+
+    # re-order the columns so that it looks better 
+    reorderedCols = ['studentID', 'time', 'time_zone', 'timestamp'] + fetchedDetectors
+    # make sure that we are not missing any columns 
+    assert set(reorderedCols) == set(studentStatusDF.columns)
+    studentStatusDF = studentStatusDF[reorderedCols] # re-order columns
+
+    # do label encoding for the detector values 
+    encoding = { 
+            "struggle": {'0, > 0 s,  ': 0,
+                            '1, > 25 s, slow to master some skills': 1,
+                            '1, > 45 s, slow to master some skills': 2,
+                            '1, > 1 min, slow to master some skills': 3,
+                            '1, > 2 min, slow to master some skills': 4,
+                            '1, > 5 min, slow to master some skills': 5, 
+                            '1, > 10 min, slow to master some skills': 6
+                            }, 
+            "idle": {'1, > 2 min': 1, 
+                        '1, > 5 min': 2,
+                    }, 
+            "misuse": {'0, > 0 s,  ': 0, 
+                        '1, > 25 s, abusing hints?': 1,
+                        '1, > 25 s, fast attempts in a row, not deliberate?': 1,
+                        '1, > 45 s, abusing hints?': 2,
+                        '1, > 45 s, fast attempts in a row, not deliberate?': 2,
+                        '1, > 1 min, abusing hints?': 3,
+                        '1, > 1 min, fast attempts in a row, not deliberate?': 3,
+                        '1, > 2 min, abusing hints?': 4,
+                        '1, > 2 min, fast attempts in a row, not deliberate?': 4,
+                        '1, > 5 min, fast attempts in a row, not deliberate?': 5
+                        },
+            "gaming": {'Gaming': 1, 
+                        'Not gaming': 0
+                        } 
+            }
+
+    encodedDF = studentStatusDF.replace(encoding)
+    encodedDF = encodedDF.sort_values("timestamp")
+
+    return encodedDF
+
 
 def getDetectorResultsDF(path="output_files/detector_results.csv", delimiter=","): 
 
