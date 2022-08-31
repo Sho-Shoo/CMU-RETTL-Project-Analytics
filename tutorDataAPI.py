@@ -310,6 +310,233 @@ def getTimePerStep(tutorLogDF, students=None, startTime=None, endTime=None):
     if numOfSteps == 0: return np.nan 
     else: return totalTime / numOfSteps
 
+
+def getIncorrectCount(tutorLogDF, students=None, startTime=None, endTime=None): 
+    """
+    Returns a dataframe with total count of incorrect attempts for each student 
+    in a given list within a given time period (startTime, endTime). If student 
+    list is not specified (None), all students that appear in the data will be
+    counted 
+    """
+
+    # basic filtering 
+    filteredDF = filterWithStudents(tutorLogDF, students) 
+    filteredDF = filterWithTime(filteredDF, startTime, endTime) 
+    filteredDF = filteredDF.loc[filteredDF["Outcome"] == "INCORRECT"]
+
+    # count the number of incorrect attempts 
+    countDF = filteredDF.groupby("Anon Student Id").count()
+    resDF = pd.DataFrame() 
+    resDF["studentID"]= countDF.index
+    resDF["IncorrectCount"] = countDF["Row"].tolist()
+
+    return resDF
+
+
+def getFirstAttemptPerf(tutorLogDF, students=None, startTime=None, endTime=None): 
+    """
+    Returned a pandas dataframe with two columns: `studentID` and `firstAttemptPerformance`. 
+
+    Args:
+        tutorLogDF (pandas.DataFrame): tutor log dataframe
+        students (list, optional): list to student to generate first attempt 
+            performance on. Defaults to None to include all students
+        startTime (int/float, optional): start time stamp. Defaults to None.
+        endTime (int/float, optional): end time stamp. Defaults to None.
+
+    Returns:
+        pandas.DataFrame: a pandas dataframe with two columns: `studentID` and `firstAttemptPerformance`
+    """
+
+    # basic filtering 
+    filteredDF = filterWithStudents(tutorLogDF, students) 
+    filteredDF = filterWithTime(filteredDF, startTime, endTime) 
+    # only consider the first attempt
+    filteredDF = filteredDF.loc[ filteredDF["Attempt At Step"] == 1 ] 
+    # get the correct first attempts only 
+    studentGroups = filteredDF.groupby("Anon Student Id") # groupby object by studentID's 
+
+    def getIndStudFirstAttemptPerf(indStudDF): 
+
+        indStudDF = indStudDF.loc[ indStudDF["Attempt At Step"] == 1 ] 
+        valueCounts = indStudDF["Outcome"].value_counts() 
+        correctFirstAttemptCount = valueCounts.get("CORRECT", 0)
+        firstAttemptCount = correctFirstAttemptCount + \
+                            valueCounts.get("INCORRECT", 0) + \
+                            valueCounts.get("HINT", 0) 
+
+        return correctFirstAttemptCount / firstAttemptCount 
+
+    firstAttemptPerf = studentGroups.apply(getIndStudFirstAttemptPerf) 
+    firstAttemptPerf = pd.DataFrame({"firstAttemptPerformance": firstAttemptPerf}) 
+    firstAttemptPerf["studentID"] = firstAttemptPerf.index
+    firstAttemptPerf.index = np.arange(len(firstAttemptPerf)) 
+    return firstAttemptPerf
+
+def getAvgCorrectStepDuration(tutorLogDF, students=None, startTime=None, endTime=None): 
+    """
+    Returns a dataframe with a column of `studentID` and a column with the average 
+    seconds spent on correct steps
+
+    Args:
+        tutorLogDF (pandas.DataFrame): usually a pandas.DataFrame object returned by getAnnotated getAnnotatedTutorLogDF()
+        students (list[str], optional): a list of students to be filtered. Defaults to None to get all student's information 
+        startTime (int/float, optional): period start time for filtering. Defaults to None to include all transactions 
+        endTime (int/float, optional): period end time for filtering. Defaults to None to include all transactions 
+
+    Returns:
+        pandas.DataFrame: a dataframe with a column of `studentID` and a column with the average time named `avgCorrectStepDuration`
+    """
+
+    # basic filtering 
+    filteredDF = filterWithStudents(tutorLogDF, students) 
+    filteredDF = filterWithTime(filteredDF, startTime, endTime) 
+    # consider only the first correct attempts 
+    filteredDF = filteredDF.loc[ (filteredDF["Outcome"] == "CORRECT") & \
+                                 (filteredDF["Attempt At Step"] == 1) & \
+                                 (filteredDF["Is Last Attempt"] == 1) ] 
+    studentGroups = filteredDF.groupby("Anon Student Id") 
+    avgCorrectStepDuration = studentGroups.apply(getTimePerStep) 
+    # pass to a new dataframe with correct column names 
+    resDF = pd.DataFrame()
+    resDF["studentID"] = avgCorrectStepDuration.index 
+    resDF["avgCorrectStepDuration"] = avgCorrectStepDuration.tolist()
+    
+    return resDF 
+
+def getAvgErrorStepDuration(tutorLogDF, students=None, startTime=None, endTime=None): 
+    """
+    Returns a dataframe with a column of `studentID` and a column with the average 
+    seconds spent on errorous steps, which include both hints and incorrect steps
+
+    Args:
+        tutorLogDF (pandas.DataFrame): usually a pandas.DataFrame object returned by getAnnotated getAnnotatedTutorLogDF()
+        students (list[str], optional): a list of students to be filtered. Defaults to None to get all student's information 
+        startTime (int/float, optional): period start time for filtering. Defaults to None to include all transactions 
+        endTime (int/float, optional): period end time for filtering. Defaults to None to include all transactions 
+
+    Returns:
+        pandas.DataFrame: a dataframe with a column of `studentID` and a column with the average time named `avgErrorStepDuration`
+    """
+
+    # basic filtering 
+    filteredDF = filterWithStudents(tutorLogDF, students) 
+    filteredDF = filterWithTime(filteredDF, startTime, endTime) 
+    # error incorporates incorrect and hint 
+    incorrect = filteredDF.loc[filteredDF["Outcome"] == "INCORRECT"] 
+    hint = filteredDF.loc[filteredDF["Outcome"] == "HINT"] 
+    # get the correct transaction which is the last correct attempt after a sequence of error attempts 
+    correctAtLast = filteredDF.loc[ (filteredDF["Outcome"] == "CORRECT") & \
+                                    (filteredDF["Attempt At Step"] != 1) & \
+                                    (filteredDF["Is Last Attempt"] == 1)]
+    filteredDF = pd.concat([incorrect, hint, correctAtLast], ignore_index=True) 
+
+    studentGroups = filteredDF.groupby("Anon Student Id") 
+    avgCorrectStepDuration = studentGroups.apply(getTimePerStep) 
+    # pass to a new dataframe with correct column names 
+    resDF = pd.DataFrame()
+    resDF["studentID"] = avgCorrectStepDuration.index 
+    resDF["avgErrorStepDuration"] = avgCorrectStepDuration.tolist()
+    
+    return resDF 
+
+def getAvgHintDurationPerStep(tutorLogDF, students=None, startTime=None, endTime=None): 
+
+    """
+    Returns a dataframe with a column of `studentID` and a column with the average 
+    seconds spent on looking at hints for errorous steps
+
+    Args:
+        tutorLogDF (pandas.DataFrame): usually a pandas.DataFrame object returned by getAnnotated getAnnotatedTutorLogDF()
+        students (list[str], optional): a list of students to be filtered. Defaults to None to get all student's information 
+        startTime (int/float, optional): period start time for filtering. Defaults to None to include all transactions 
+        endTime (int/float, optional): period end time for filtering. Defaults to None to include all transactions 
+
+    Returns:
+        pandas.DataFrame: a dataframe with a column of `studentID` and a column with the average time named `avgHintDurationPerStep`
+    """
+
+    # basic filtering 
+    filteredDF = filterWithStudents(tutorLogDF, students) 
+    filteredDF = filterWithTime(filteredDF, startTime, endTime) 
+
+    studentGroups = filteredDF.groupby("Anon Student Id") 
+
+    # helper function to put into .apply() 
+    def getAvgHintDurationPerStepPerStud(studDF): 
+
+        # obtain the errorous steps count 
+        errorCount = 0
+        # obtain time spent looking at hints 
+        hintDuration = 0 
+
+        for i in studDF.index: 
+
+            # is errorous step if the first attempt is not correct, i.e., hint or incorrect 
+            if studDF.loc[i, "Attempt At Step"] == 1 and \
+               (studDF.loc[i, "Outcome"] == "HINT" or studDF.loc[i, "Outcome"] == "INCORRECT"): 
+               errorCount += 1
+
+            # summarize for number of seconds spent looking at hints 
+            if studDF.loc[i, "Outcome"] == "HINT": 
+                hintDuration += studDF.loc[i, "Duration (sec)"]
+
+        if errorCount == 0: 
+            return np.nan
+        else: return hintDuration / errorCount 
+
+    # pandas series indexed by anon student id that has avg. time for each student 
+    avgHintDurationPerStep = studentGroups.apply(getAvgHintDurationPerStepPerStud) 
+
+    resDF = pd.DataFrame() # to be returned 
+    resDF["studentID"] = avgHintDurationPerStep.index
+    resDF["avgHintDurationPerStep"] = avgHintDurationPerStep.tolist()
+
+    return resDF 
+
+def getAssistanceScorePerStep(tutorLogDF, students=None, startTime=None, endTime=None): 
+
+    """
+    Returns a dataframe with a column of `studentID` and a column with the average 
+    assistance score for each student per step, where assistance score is defined 
+    as number of incorrect + number of hint. Here each student's result will be
+    calculated as (totalAssistanceScore / number of steps)
+
+    Args:
+        tutorLogDF (pandas.DataFrame): usually a pandas.DataFrame object returned by getAnnotated getAnnotatedTutorLogDF()
+        students (list[str], optional): a list of students to be filtered. Defaults to None to get all student's information 
+        startTime (int/float, optional): period start time for filtering. Defaults to None to include all transactions 
+        endTime (int/float, optional): period end time for filtering. Defaults to None to include all transactions 
+
+    Returns:
+        pandas.DataFrame: a dataframe with a column of `studentID` and a column with the average time named `avgHintDurationPerStep`
+    """
+
+    # basic filtering 
+    filteredDF = filterWithStudents(tutorLogDF, students) 
+    filteredDF = filterWithTime(filteredDF, startTime, endTime) 
+
+    studentGroups = filteredDF.groupby("Anon Student Id") 
+
+    # helper function to put into .apply() 
+    def getAssistanceScorePerStepPerStud(studDF): 
+
+        totalAssistanceScore = 0 
+        # formula for assistance score: number of incorrect + number of hints 
+        assistanceScore = len(studDF.loc[ (studDF["Outcome"] == "INCORRECT") | (studDF["Outcome"] == "HINT") ])
+        totalSteps = getNumOfSteps(studDF) 
+
+        if totalSteps == 0: return np.nan 
+        else: return assistanceScore / totalSteps 
+
+    assistanceScorePerStep = studentGroups.apply(getAssistanceScorePerStepPerStud) 
+
+    resDF = pd.DataFrame()
+    resDF["studentID"] = assistanceScorePerStep.index
+    resDF["assistanceScorePerStep"] = assistanceScorePerStep.tolist() 
+
+    return resDF 
+
 def getAnnotatedTutorLogDF(tutorLogFilePath: str, delimiter: str="\t", startTimestamp: float=None, endTimestamp: float=None): 
 
     """
