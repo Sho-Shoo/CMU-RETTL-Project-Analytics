@@ -1,0 +1,245 @@
+---
+title: "Student Level Partial Correlation & Linear Regression Analysis"
+author: "Tianze (Steven) Shou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r}
+library(tidyverse)
+library(ppcor)
+library(psych)
+library(testit)
+```
+
+
+# Loading Data from Output File Folder 
+
+```{r}
+analyticsDF = read_csv("output_files/analytics_data.csv") 
+```
+
+
+# Partial Correlation Demos 
+
+Below we are going to demonstrate some variables fitted into the `ppcor` partial correlation model
+
+```{r}
+uncleaned_data = cbind(analyticsDF$PlearningGain, 
+                       analyticsDF$overallPerformance, 
+                       analyticsDF$totalTimeInTutor)
+cleaned_data = na.omit(uncleaned_data)
+colnames(cleaned_data) <- c("PlearningGain", 
+                            "overallPerformance", 
+                            "totalTimeInTutor")
+cleaned_data <- as.data.frame(cleaned_data)
+# partial correlation between procedural learning gain and overall performance 
+# controlling for total time in tutor
+pcor.test(cleaned_data$PlearningGain, 
+          cleaned_data$overallPerformance, 
+          cleaned_data$totalTimeInTutor)
+```
+
+# Multi-linear Model to Predict Learning Gain 
+
+## Using Unimodal Data (Data from Students only) 
+
+Below is the **multilinear regression model** to predict **procedural learning gain**. 
+
+```{r}
+                           # in-system indicators 
+model = lm(PlearningGain ~ overallPerformance + hintRequested + problemsSolved +
+                           totalSteps + timePerStep + IncorrectCount + 
+                           firstAttemptPerformance + avgCorrectStepDuration + 
+                           avgErrorStepDuration + avgHintDurationPerStep + 
+                           assistanceScorePerStep + 
+                           # kc-level performance 
+                           # cancel_constPerformance + division_simplePerformance +
+                           # dividePerformance + subtraction_constPerformance +
+                           # combine_like_constPerformance + subtraction_varPerformance +
+                           # combine_like_varPerformance + cancel_varPerformance + 
+                           # distribute_divisionPerformance + division_complexPerformance + 
+                           # detector output 
+                           idle + struggle + gaming + misuse +
+                           # control vars 
+                           PPreScore + CPreScore + totalTimeInTutor, 
+           analyticsDF) 
+summary(model)
+```
+
+Below is the **multilinear regression model** to predict **conceptual learning gain**. 
+
+```{r}
+                           # in-system indicators 
+model = lm(ClearningGain ~ overallPerformance + hintRequested + problemsSolved +
+                           totalSteps + timePerStep + IncorrectCount + 
+                           firstAttemptPerformance + avgCorrectStepDuration + 
+                           avgErrorStepDuration + avgHintDurationPerStep + 
+                           assistanceScorePerStep + 
+                           # detector output 
+                           idle + struggle + gaming + misuse +
+                           # control vars 
+                           PPreScore + CPreScore + totalTimeInTutor, 
+           analyticsDF) 
+summary(model)
+```
+
+## Using Multi-modal Data (Data from both Students and Teacher) 
+
+```{r}
+                           # in-system indicators 
+model = lm(PlearningGain ~ overallPerformance + hintRequested + problemsSolved +
+                           totalSteps + timePerStep + IncorrectCount + 
+                           firstAttemptPerformance + avgCorrectStepDuration + 
+                           avgErrorStepDuration + avgHintDurationPerStep + 
+                           assistanceScorePerStep + 
+                           # detector output 
+                           idle + struggle + gaming + misuse +
+                           # control vars 
+                           PPreScore + CPreScore + totalTimeInTutor + 
+                           # teacher strategy (obs) 
+                           totalOffTaskTeacherVisits + totalOnTaskTeacherVisits + 
+                           # teacher strategy (pos) 
+                           stopsCount + stopsLengthMean + stopsLengthStd +
+                           # student help seeking 
+                           totalHandRaises, 
+           analyticsDF) 
+summary(model)
+
+print("*************************************************************************")
+
+                           # in-system indicators 
+model = lm(ClearningGain ~ overallPerformance + hintRequested + problemsSolved +
+                           totalSteps + timePerStep + IncorrectCount + 
+                           firstAttemptPerformance + avgCorrectStepDuration + 
+                           avgErrorStepDuration + avgHintDurationPerStep + 
+                           assistanceScorePerStep + 
+                           # detector output 
+                           idle + struggle + gaming + misuse +
+                           # control vars 
+                           PPreScore + CPreScore + totalTimeInTutor + 
+                           # teacher strategy (obs) 
+                           totalOffTaskTeacherVisits + totalOnTaskTeacherVisits + 
+                           # teacher strategy (pos) 
+                           stopsCount + stopsLengthMean + stopsLengthStd +
+                           # student help seeking 
+                           totalHandRaises, 
+           analyticsDF) 
+summary(model)
+```
+
+## Include All Interaction Terms 
+
+The model below is not promising here. Since we have so any predictors, the residual's degree of freedom drops to zero. Consequantly, we cannot assess the MSE here, which is why many parameters of the model appear to be NA's. 
+
+```{r}
+                           # in-system indicators 
+model = lm(PlearningGain ~ (overallPerformance + hintRequested + problemsSolved +
+                           totalSteps + timePerStep + IncorrectCount + 
+                           firstAttemptPerformance + avgCorrectStepDuration + 
+                           avgErrorStepDuration + avgHintDurationPerStep + 
+                           assistanceScorePerStep + 
+                           # detector output 
+                           idle + struggle + gaming + misuse +
+                           # control vars 
+                           PPreScore + CPreScore + totalTimeInTutor + 
+                           # teacher strategy (obs) 
+                           totalOffTaskTeacherVisits + totalOnTaskTeacherVisits + 
+                           # teacher strategy (pos) 
+                           stopsCount + stopsLengthMean + stopsLengthStd +
+                           # student help seeking 
+                           totalHandRaises)^2, 
+           analyticsDF) 
+summary(model)
+
+print("*************************************************************************")
+
+                           # in-system indicators 
+model = lm(ClearningGain ~ (overallPerformance + hintRequested + problemsSolved +
+                           totalSteps + timePerStep + IncorrectCount + 
+                           firstAttemptPerformance + avgCorrectStepDuration + 
+                           avgErrorStepDuration + avgHintDurationPerStep + 
+                           assistanceScorePerStep + 
+                           # detector output 
+                           idle + struggle + gaming + misuse +
+                           # control vars 
+                           PPreScore + CPreScore + totalTimeInTutor + 
+                           # teacher strategy (obs) 
+                           totalOffTaskTeacherVisits + totalOnTaskTeacherVisits + 
+                           # teacher strategy (pos) 
+                           stopsCount + stopsLengthMean + stopsLengthStd +
+                           # student help seeking 
+                           totalHandRaises)^2, 
+           analyticsDF) 
+summary(model)
+``` 
+
+# Partial Correlation with Control Variables 
+
+Here we are controlling for `PPreScore`, `CPreScore`, and `totalTimeInTutor`. The final output will have each variable for each row, with each other variable's correlation and p-value as columns. 
+
+I am omitting KC-level variables for now, since for some KC's, many students did not complete any question corresponding to them, therefore, leaving many values missing. 
+
+```{r}
+includeKCLevelVars = FALSE
+KCLevelColNames = c("cancel_constPerformance", "division_simplePerformance", "dividePerformance", 
+                    "subtraction_constPerformance", "combine_like_constPerformance", 
+                    "subtraction_varPerformance", "combine_like_varPerformance", "cancel_varPerformance",
+                    "distribute_divisionPerformance", "division_complexPerformance") 
+controlVarNames = c("PPreScore", "CPreScore", "totalTimeInTutor")
+unwantedColNames = c("studentID", controlVarNames)
+if(!includeKCLevelVars){
+  unwantedColNames = c(unwantedColNames, KCLevelColNames) 
+}
+wantedColNames = setdiff(colnames(analyticsDF), unwantedColNames)
+# partial correlation table size should be size * (2*size), since we are including both coefficients and p-values 
+corrTableSize = length(colnames(analyticsDF)) - length(unwantedColNames) 
+assert(length(wantedColNames) == corrTableSize) # safety check 
+
+# initialize an empty partial correlation table 
+corrTable = as.data.frame(matrix(nrow=0, ncol=corrTableSize*2+1))
+# get the column names for the corr table 
+corrTableColNames = c("varName")
+for(name in wantedColNames){
+  corrTableColNames = c(corrTableColNames, paste(name, "_estimate", sep="")) 
+  corrTableColNames = c(corrTableColNames, paste(name, "_p_value", sep="")) 
+}
+
+for(name1 in wantedColNames){
+  currRow = c(name1)
+  # populate current row with estimate and p-value
+  for(name2 in wantedColNames){
+    # get rid of the NA's in these columns 
+    pcorrDF = analyticsDF[complete.cases(analyticsDF[, c(name1, name2, controlVarNames)]),] 
+    
+    corrResults = pcor.test(pcorrDF[[name1]], pcorrDF[[name2]], 
+                            pcorrDF[,controlVarNames], # control variables
+                            method="pearson") 
+    currRow = c(currRow, corrResults$estimate, corrResults$p.value) 
+  }
+  # append current row to corr table 
+  corrTable = rbind(corrTable, currRow) 
+}
+
+names(corrTable) <- corrTableColNames # assign the col names 
+head(corrTable)
+
+```
+
+Since the pairwise correlation table is too large here, I am going to send out a separate csv file. 
+
+```{r}
+write.csv(corrTable, "output_files/partial_corrlation_table.csv")
+```
+
+
+
+
