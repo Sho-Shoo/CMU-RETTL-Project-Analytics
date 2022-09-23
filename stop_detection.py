@@ -129,8 +129,6 @@ def validateStops(stops, duration, maxDuration, epsilon=0.4):
 
     return True
 
-
-
 def getStops(X, Y, timestamp, periods, days, duration, radius): 
 
     '''
@@ -196,6 +194,71 @@ def getStops(X, Y, timestamp, periods, days, duration, radius):
 
 
     assert(validateStops(stops, duration, maxDuration))
+    return stops
+
+def getStopsAndCentroids(X, Y, timestamp, periods, days, duration, radius): 
+
+    '''
+    This function is adapted from getStops(), adding centroid coordinates to 
+    the returned result 
+    
+    @param X: an numpy array of x-coordinates 
+    @param Y: an numpy array of y-coordinates, must be same length as X
+    @param timestamp: an array of timestamps, must be same length as X and Y
+    @param duration: the minimum duration that the teacher stays in-place to 
+                    establish a stop. Unit is second
+    @param radius: teacher position must be with in the radius of coordinate 
+                centroid to establish a stop. Unit is milimeter
+    @return: an array of tuple (<stopStartTime>, <stopEndTime>, <centroidX>, <centroidY>) 
+    '''
+
+    assert len(X) == len(Y), "Lengths of X, Y coordinate arrays should be identical"
+    assert len(timestamp) == len(X), "Lengths timestamp array should be identical to coordinate arrays" 
+
+    # arrange X, Y coordinates into a array of tuples 
+    pos = [] 
+    for i in range(len(X)): 
+        pos.append( (X[i], Y[i]) ) 
+    assert(len(pos) == len(timestamp)) 
+    
+    stops = [] # output array
+    # format:[ (<stop_start_time>, <stop_end_time>), ... ]
+
+    # loop thru the pos array in the time frame specified by `duration`
+    startIndex = 0
+    while(startIndex < len(pos) - duration): 
+        
+        endIndex = startIndex + 1
+
+        # look further down position points if all points are within radius
+        while(withinRadius(pos[startIndex: endIndex], radius) and 
+              endIndex < len(pos) and 
+              # the following condition is to ensure that we do not detect
+              # a stop that goes into two periods or days
+              periods[startIndex] == periods[endIndex] and 
+              days[startIndex] == days[endIndex]): 
+            endIndex += 1 
+
+        endIndex -= 1 # since endIndex always go over by 1, and we want end and start to be both inclusive 
+
+        # this means that no stop is detected 
+        if(timestamp[endIndex] < timestamp[startIndex] + duration):
+            # move the timeframe to the next second
+            startIndex += 1
+        # a stop is detected 
+        else:
+            # pass this stop to output array 
+            if(endIndex >= len(pos)): endIndex = len(pos) - 1 # to catch the edge case 
+
+            # slice out the points to calculate stops centroid
+            points = cols2tuples(X[startIndex: endIndex+1], Y[startIndex: endIndex+1]) 
+            centroidX, centroidY = getCentroid(points)
+            # append time start/end time and centroid X/Y to output list of tuples 
+            stops.append( (timestamp[startIndex], timestamp[endIndex], centroidX, centroidY) ) 
+
+            # start of next timeframe should be the end of this stop 
+            startIndex = endIndex
+    
     return stops
 
 def getStopsFromObs(obsLog): 
