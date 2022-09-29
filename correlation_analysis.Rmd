@@ -259,5 +259,5 @@ head(corrTable)
 Since the pairwise correlation table is too large here, I am going to send out a separate csv file.
 
 ```{r}
-write.csv(corrTable, "output_files/partial_corrlation_table.csv")
+write.csv(corrTable, "output_files/partial_corrlation_table.csv", row.names=FALSE)
 ```
