@@ -102,6 +102,27 @@ def filterWithTime(tutorLogDF, startTime, endTime):
 
     return filteredDF
 
+def getStudentIDsByTime(tutorLogDF, startTime=None, endTime=None): 
+    """
+    Get student ID's who have transaction records between start and end time
+    """
+    # input check
+    assert(startTime == None or endTime == None or endTime > startTime) 
+
+    filteredDF = filterWithTime(tutorLogDF, startTime, endTime) 
+    studentIDs = filteredDF["Anon Student Id"].unique().tolist() 
+    return studentIDs 
+
+def getStudentIDsByPeriod(tutorLogDF, periodID): 
+    """
+    Get student ID's who have transaction records by period ID. Note that the 
+    period ID used in tutor log does not match with our regular definition, and 
+    this function does not account for that 
+    """
+    filteredDF = tutorLogDF.loc[tutorLogDF["Class"] == f"Period{periodID}"] 
+    studentIDs = filteredDF["Anon Student Id"].unique().tolist() 
+    return studentIDs 
+
 def getStudentPerformanceSummary(tutorLogDF, students=None, startTime=None, endTime=None):
     """
     Measures student performance by percentage of attempt correctness during a time interval
