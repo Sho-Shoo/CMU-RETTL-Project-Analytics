@@ -29,7 +29,12 @@ analyticsDF = read_csv("output_files/analytics_data.csv")
 
 period3StudentIDs = c('Stu_064567c1ccf2d7da2dfbcd94e7bb57a9', 'Stu_35264f9486d139717d2583ddba2fd107', 'Stu_4a4dc1cf9ecb255e0a496933fae6a541', 'Stu_4ae0ba339faed21609e388896a3ca39a', 'Stu_4b90cf3dc7e7213d1c95dbff195a4b08', 'Stu_4d5e4c0ed4b7ee7619560045d26ac68f', 'Stu_5d44d028d141d7ee20d2ec2f8c071737', 'Stu_74d69ff42bec55f68bdc5e17d192edd0', 'Stu_8121874e3dd74a6e3f583961114cd5ac', 'Stu_83a64d3c071f48b442050f2f07c809a1', 'Stu_86d7cb3153651b145f14829a163b0ac1', 'Stu_8985f41920ff8b801e1041239d57f381', 'Stu_a6d375d75081ceeff1a699e2892e1cc7', 'Stu_ac964194a0201c04b42b142960040200', 'Stu_ad3644e04bb6c4380286ec229aa48df1', 'Stu_ae7b3cc968126dd507f1c8439271e0ce', 'Stu_e2dbbb1e34f2fff42d4f1d3fc9b6e6f1', 'Stu_fb2eeaba8564e77a442d9b0a2cadf55f')
 
-analyticsDF = analyticsDF[analyticsDF$studentID %in% period3StudentIDs,]
+# analyticsDF = analyticsDF[analyticsDF$studentID %in% period3StudentIDs,]
+cat("Columns in analyticsDF are:")
+for(name in colnames(analyticsDF)){
+  printed = paste("`", name, "`, ", sep="")
+  cat(printed)
+}
 ```
 
 # Descriptive Statistics and Visuals
